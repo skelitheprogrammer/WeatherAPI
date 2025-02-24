@@ -1,0 +1,8 @@
+/.idea
+WebAPI/appsettings.json
+WebAPI/appsettings.Development.json
+/WebAPI/bin
+/WebAPI/obj
+WebAPI/Properties/launchSettings.json
+WeatherAPI.sln
+WeatherAPI.sln.DotSettings.user
