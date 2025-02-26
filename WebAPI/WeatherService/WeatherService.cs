@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Globalization;
+using System.Text.Json;
 namespace WebAPI.WeatherService;
 
 internal sealed class WeatherService : IWeatherService
@@ -15,11 +16,12 @@ internal sealed class WeatherService : IWeatherService
         _baseUrl = configuration["WeatherAPI:BaseUrl"];
     }
 
-    public async Task<WeatherForecast> GetWeatherAsync(string location)
+    public async Task<WeatherForecast> GetWeatherAsync(string location, DateOnly date)
     {
         HttpClient httpClient = _factory.CreateClient();
+        Uri uri = CreateURI($"{_baseUrl}/{location}/{ParseString(date)}?unitGroup=metric&key={_key}");
 
-        string stringAsync = await httpClient.GetStringAsync($"{_baseUrl}/{location}?key={_key}");
+        string stringAsync = await httpClient.GetStringAsync(uri);
 
         using JsonDocument document = JsonDocument.Parse(stringAsync);
         JsonElement root = document.RootElement;
@@ -30,4 +32,38 @@ internal sealed class WeatherService : IWeatherService
 
         return new(dateOnly, temp);
     }
+    public async IAsyncEnumerable<WeatherForecast> GetWeatherAsync(string location, DateOnly fromDate, DateOnly toDate)
+    {
+        HttpClient client = _factory.CreateClient();
+        Uri uri = CreateURI($"{_baseUrl}/{location}/{ParseString(fromDate)}/{ParseString(toDate)}?unitGroup=metric&key={_key}");
+
+        string stringAsync = await client.GetStringAsync(uri);
+
+        using JsonDocument document = JsonDocument.Parse(stringAsync);
+        JsonElement root = document.RootElement;
+        JsonElement daysArray = root.GetProperty("days");
+
+
+        foreach (JsonElement jsonElement in daysArray.EnumerateArray())
+        {
+            DateOnly dateOnly = DateOnly.Parse(jsonElement.GetProperty("datetime").GetString().AsSpan());
+            double temp = jsonElement.GetProperty("temp").GetDouble();
+
+            yield return new(dateOnly, temp);
+        }
+    }
+
+    private static Uri CreateURI(string address)
+    {
+        bool tryCreate = Uri.TryCreate(address, UriKind.Absolute, out Uri? uri);
+
+        if (!tryCreate || uri is null)
+        {
+            throw new UriFormatException();
+        }
+
+        return uri;
+    }
+
+    private static string ParseString(DateOnly date) => date.ToString("yyyy-MM-dd");
 }
